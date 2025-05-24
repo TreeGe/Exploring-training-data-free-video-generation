@@ -11,6 +11,7 @@ We proposed method can generate various types of videos, as has been thoroughly 
 ## Results
 All our results are based on stable-diffusion-v1-4 model. Please the website for more results.
 ![image](https://github.com/TreeGe/Exploring-training-data-free-video-generation/blob/main/images/res1.png)
+![image](https://github.com/TreeGe/Exploring-training-data-free-video-generation/blob/main/images/res2.png)
 The top row for each of the results below show generating of real images, and the bottom row shows synthetic image generating.
 ## Real Image generating
 ![image](https://github.com/TreeGe/Exploring-training-data-free-video-generation/blob/main/images/generate_real.png)
