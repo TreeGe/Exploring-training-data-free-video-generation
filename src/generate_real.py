@@ -1,12 +1,12 @@
 import os
-
 import argparse
 import torch
-import glob
-
+import imageio
+from PIL import Image
 from diffusers import DDIMScheduler
-from utils.edit_directions import construct_direction
-from src.edit_pipeline import EditingPipeline
+from edit_pipeline_inter_flow import EditingPipeline
+from utils.ddim_inv import DDIMInversion
+from utils.scheduler import DDIMInverseScheduler
 
 if torch.cuda.is_available():
     device = "cuda"
@@ -14,18 +14,38 @@ else:
     device = "cpu"
 
 
-if __name__=="__main__":
+def load_sentence_embeddings(l_sentences, tokenizer, text_encoder, device=device):
+    with torch.no_grad():
+        l_embeddings = []
+        for sent in l_sentences:
+            text_inputs = tokenizer(
+                sent,
+                padding="max_length",
+                max_length=tokenizer.model_max_length,
+                truncation=True,
+                return_tensors="pt",
+            )
+            text_input_ids = text_inputs.input_ids
+            prompt_embeds = text_encoder(text_input_ids.to(device), attention_mask=None)[0]
+            l_embeddings.append(prompt_embeds)
+    return torch.cat(l_embeddings, dim=0).mean(dim=0).unsqueeze(0)
+
+
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--inversion',default='output/test/inversion/1_0.pt',type=str)
-    parser.add_argument('--prompt', default='output/test/prompt/1_0.txt',type=str)
-    parser.add_argument('--task_name', type=str, default='ree2reeduringfall')
-    parser.add_argument('--results_folder', type=str, default='output/test')
     parser.add_argument('--num_ddim_steps', type=int, default=50)
+    parser.add_argument('--model_path', type=str, default='')
     parser.add_argument('--model_path', type=str, default='model_path')
     parser.add_argument('--xa_guidance', default=0.1, type=float)
     parser.add_argument('--negative_guidance_scale', default=5.0, type=float)
     parser.add_argument('--use_float_16', action='store_true')
-    parser.add_argument('--samples_times', type=int, default=1)
+    parser.add_argument('--samples_times', type=int, default=6)
+
+    parser.add_argument('--input_img', default="output/test/real_image/girffe.png")
+    parser.add_argument('--input_sentence', default="a giraffe standing next to a lush green field")
+    parser.add_argument('--input', default="noon")
+    parser.add_argument('--output', default="night")
+
 
     args = parser.parse_args()
 
@@ -37,35 +57,39 @@ if __name__=="__main__":
     else:
         torch_dtype = torch.float32
 
-    # if the inversion is a folder, the prompt should also be a folder
-    assert (os.path.isdir(args.inversion)==os.path.isdir(args.prompt)), "If the inversion is a folder, the prompt should also be a folder"
-    if os.path.isdir(args.inversion):
-        l_inv_paths = sorted(glob.glob(os.path.join(args.inversion, "*.pt")))
-        l_bnames = [os.path.basename(x) for x in l_inv_paths]
-        l_prompt_paths = [os.path.join(args.prompt, x.replace(".pt",".txt")) for x in l_bnames]
-    else:
-        l_inv_paths = [args.inversion]   #获取加噪后的图像
-        l_prompt_paths = [args.prompt]   #获取文本提示
+    pipe1 = DDIMInversion.from_pretrained(args.model_path, torch_dtype=torch_dtype).to(device)
+    pipe1.scheduler = DDIMInverseScheduler.from_config(pipe1.scheduler.config)
 
-    # Make the editing pipeline  制作编辑管道,加载预训练好的模型
-    pipe = EditingPipeline.from_pretrained(args.model_path, torch_dtype=torch_dtype).to(device) #加载pipline
+    img = Image.open(args.input_img)
+    x_inv, x_inv_image, x_dec_img = pipe1(
+        args.input_sentence,
+        guidance_scale=1,
+        num_inversion_steps=args.num_ddim_steps,
+        img=img,
+        torch_dtype=torch_dtype
+    )
+
+    pipe = EditingPipeline.from_pretrained(args.model_path, torch_dtype=torch_dtype).to(device)
     pipe.scheduler = DDIMScheduler.from_config(pipe.scheduler.config)
+    pipe.safety_checker = lambda images, clip_input: (images, False)
 
 
-    for inv_path, prompt_path in zip(l_inv_paths, l_prompt_paths):
-        prompt_str = open(prompt_path).read().strip()  #原始图像的文本提示
-        rec_pil, edit_pil = pipe(prompt_str,
-                num_inference_steps=args.num_ddim_steps,
-                x_in=torch.load(inv_path).unsqueeze(0),
-                edit_dir=construct_direction(args.task_name),
-                guidance_amount=args.xa_guidance,
-                guidance_scale=args.negative_guidance_scale,
-                negative_prompt=prompt_str , # use the unedited prompt for the negative prompt
-                samples_times = args.samples_times
+    input_mean_emb = load_sentence_embeddings([args.input], pipe.tokenizer, pipe.text_encoder, device='cuda')
+    output_mean_emb = load_sentence_embeddings([args.output], pipe.tokenizer, pipe.text_encoder, device='cuda')
 
-        )
-        
-        bname = os.path.basename(args.inversion).split(".")[0]
-        for i in range(0,args.samples_times):
-            (edit_pil[i])[0].save(os.path.join(args.results_folder, f"1000_0.{i}_1.png"))
+    edit_dir = ((output_mean_emb.mean(0) - input_mean_emb.mean(0)).unsqueeze(0))
+    rec_pil, edit_pil, edit_inter = pipe(args.input_sentence,
+                                         num_inference_steps=args.num_ddim_steps,
+                                         x_in=x_inv,
+                                         edit_dir=edit_dir,
+                                         guidance_amount=args.xa_guidance,
+                                         guidance_scale=args.negative_guidance_scale,
+                                          negative_prompt=args.input_sentence,
+                                         samples_times=args.samples_times
+                                         )
 
+    rec_pil[0].save(f"args.results_folder/rec.png")
+    for i in range(0, args.samples_times):
+        (edit_pil[i]).save(os.path.join(f"args.results_folder/rec.png"))
+
+    imageio.mimsave(f'args.results_folder/gene_default.gif', 'GIF', duration=250)
