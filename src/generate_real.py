@@ -35,7 +35,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--num_ddim_steps', type=int, default=50)
     parser.add_argument('--model_path', type=str, default='')
-    parser.add_argument('--model_path', type=str, default='model_path')
     parser.add_argument('--xa_guidance', default=0.1, type=float)
     parser.add_argument('--negative_guidance_scale', default=5.0, type=float)
     parser.add_argument('--use_float_16', action='store_true')
