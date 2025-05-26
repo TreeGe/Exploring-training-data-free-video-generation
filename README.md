@@ -4,6 +4,7 @@
 
 
 We proposed method can generate various types of videos, as has been thoroughly validated in the experimental and supplementary material sections. However, it is important to note that this method primarily relies on image- and text-guided video generation. When generating videos with subtle movements, the method requires minimal computational time and resources. However, for videos with large movements or complex scenes, multiple samplings are necessary. To achieve smoother and more fluid videos, especially in complex scenes, multiple scene divisions and frame insertions are required, and the text descriptions need to be dynamically adjusted manually, which increases the interactive workload to some extent. In future work, we will focus on improving the frame interpolation techniques for complex-motion videos to reduce the number of required interpolations and achieve smoother video generation.
+
 ![image](https://github.com/TreeGe/Exploring-training-data-free-video-generation/blob/main/images/overview.png)
 
 **TL;DR**: no finetuning required, no video input needed, input structure preserved.
@@ -14,10 +15,13 @@ All our results are based on stable-diffusion-v1-4 model. Please the website for
 ![image](https://github.com/TreeGe/Exploring-training-data-free-video-generation/blob/main/images/res2.png)
 The top row for each of the results below show generating of real images, and the bottom row shows synthetic image generating.
 ## Real Image generating
+
 ![image](https://github.com/TreeGe/Exploring-training-data-free-video-generation/blob/main/images/generate_real.png)
 
 ## synthetic image generating
+
 ![image](https://github.com/TreeGe/Exploring-training-data-free-video-generation/blob/main/images/generate_syntheis.png)
+
 ## Method Details
 Given an input image, we first generate text captions using BLIP and apply regularized DDIM inversion to obtain our inverted noise map. Then, we obtain reference cross-attention maps that correspoind to the structure of the input image by denoising, guided with the CLIP embeddings of our generated text (c). Next, we denoise with edited text embeddings, while enforcing a loss to match current cross-attention maps with the reference cross-attention maps.
 
