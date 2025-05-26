@@ -3,7 +3,6 @@ import torch
 import inspect
 from packaging import version
 from typing import Any, Callable, Dict, List, Optional, Union
-
 from transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
 from diffusers import DiffusionPipeline
 from diffusers.models import AutoencoderKL, UNet2DConditionModel
