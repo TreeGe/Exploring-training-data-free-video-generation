@@ -2,11 +2,8 @@ import os
 import pdb
 from PIL import Image
 import gradio as gr
-
-from src.utils.gradio_utils import *
-from src.utils.huggingface_utils import *
-# from utils.generate_synthetic import *
-
+from gradio_utils import *
+from huggingface_utils import *
 
 if __name__=="__main__":
     # populate the list of editing directions
